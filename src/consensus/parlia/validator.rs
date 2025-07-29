@@ -352,7 +352,7 @@ where
             parse_epoch_update(header.header(), is_luban, is_bohr)
         } else { (Vec::new(), None, None) };
 
-        if let Some(new_snap) = parent_snap.apply(
+        let new_snap = parent_snap.apply(
             header.beneficiary(),
             header.header(),
             new_validators,
@@ -360,15 +360,14 @@ where
             attestation_opt,
             turn_len,
             is_bohr,
-        ) {
-            self.provider.insert(new_snap.clone());
-            // If this is a checkpoint boundary, enqueue the compressed snapshot so the execution
-            // stage can persist it via `ExecutionOutcome`.
-            // use reth_execution_types::snapshot_pool;
-            if new_snap.block_number % super::snapshot::CHECKPOINT_INTERVAL == 0 {
-                let blob = new_snap.clone().compress();
-                crate::snapshot_pool::push((new_snap.block_number, blob));
-            }
+        ).ok_or_else(|| ConsensusError::Other("failed to apply snapshot".into()))?;
+
+        self.provider.insert(new_snap.clone());
+        // If this is a checkpoint boundary, enqueue the compressed snapshot so the execution
+        // stage can persist it via `ExecutionOutcome`.
+        if new_snap.block_number % super::snapshot::CHECKPOINT_INTERVAL == 0 {
+            let blob = new_snap.clone().compress();
+            crate::snapshot_pool::push((new_snap.block_number, blob));
         }
 
         // Report slashing evidence if proposer is not in-turn and previous inturn validator hasn't signed recently.
