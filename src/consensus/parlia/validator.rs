@@ -116,8 +116,15 @@ pub struct ParliaHeaderValidator<P> {
     provider: Arc<P>,
 }
 
-impl<P> ParliaHeaderValidator<P> {
-    pub fn new(provider: Arc<P>) -> Self { Self { provider } }
+impl<P> ParliaHeaderValidator<P>
+where
+    P: SnapshotProvider + 'static,
+{
+    pub fn new(provider: Arc<P>) -> Self {
+        // Register global snapshot provider (best‐effort; ignore if already set).
+        crate::consensus::parlia::global_snapshot::set(provider.clone());
+        Self { provider }
+    }
 }
 
 // Helper to get expected difficulty.

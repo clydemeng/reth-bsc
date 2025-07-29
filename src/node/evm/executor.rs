@@ -401,20 +401,17 @@ where
         // -----------------------------------------------------------------
         // Consensus hooks: pre-execution (rewards/slashing system-txs)
         // -----------------------------------------------------------------
-        use crate::consensus::parlia::{hooks::{ParliaHooks, PreExecutionHook}, snapshot::Snapshot};
+        use crate::consensus::parlia::hooks::{ParliaHooks, PreExecutionHook};
+        use crate::consensus::parlia::global_snapshot;
 
-        // For now we don't have snapshot wiring inside the executor yet, but the hook requires
-        // one. Use an empty default snapshot – this is sufficient for rewarding the
-        // beneficiary; over-propose slashing is already handled by `slash_pool`.
-        let snap_placeholder = Snapshot::default();
+        let parent_block_number = self.evm.block().number.to::<u64>().saturating_sub(1);
+        let snap = global_snapshot::get().snapshot(parent_block_number).unwrap_or_default();
+
         let beneficiary = self.evm.block().beneficiary;
-
-        // Assume in-turn for now; detailed check requires snapshot state which will be wired
-        // later.
-        let in_turn = true;
+        let in_turn = snap.inturn_validator() == beneficiary;
 
         let pre_out = (ParliaHooks, &self.system_contracts)
-            .on_pre_execution(&snap_placeholder, beneficiary, in_turn);
+            .on_pre_execution(&snap, beneficiary, in_turn);
 
         // Reserve block gas (simple accounting) and queue system-transactions for execution.
         if pre_out.reserved_gas > 0 {
@@ -549,15 +546,16 @@ where
         // ---- post-system-tx handling ---------------------------------
         self.distribute_block_rewards(self.evm.block().beneficiary)?;
 
-        if self.spec.is_plato_active_at_block(self.evm.block().number.to()) {
-            for tx in system_txs {
-                self.handle_finality_reward_tx(&tx)?;
-            }
-        }
+        for tx in &system_txs {
+            // Always attempt slash handling.
+            self.handle_slash_tx(tx)?;
 
-        // TODO: add breathe check and polish it later.
-        let system_txs_v2 = self.system_txs.clone();
-        for tx in &system_txs_v2 {
+            // Finality reward only after Plato activation.
+            if self.spec.is_plato_active_at_block(self.evm.block().number.to()) {
+                self.handle_finality_reward_tx(tx)?;
+            }
+
+            // ValidatorSetV2 update (post‐Plato as well).
             self.handle_update_validator_set_v2_tx(tx)?;
         }
 
