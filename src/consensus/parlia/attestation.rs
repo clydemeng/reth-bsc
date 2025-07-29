@@ -1,6 +1,5 @@
 use super::constants::*;
 use super::vote::VoteAttestation;
-use alloy_rlp as rlp;
 use alloy_consensus::BlockHeader as BlockHeaderTrait;
 
 /// Extract the `VoteAttestation` bytes slice from `header.extra_data` if present and decode.

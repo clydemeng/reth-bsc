@@ -14,5 +14,5 @@ impl Table for ParliaSnapshots {
     const DUPSORT: bool = false;
     type Key = u64;
     /// Raw compressed bytes produced by `Snapshot::compress()`.
-    type Value = reth_db::models::ParliaSnapshotBlob;
+    type Value = Vec<u8>; // compressed blob
 } 

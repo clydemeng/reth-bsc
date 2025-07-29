@@ -11,6 +11,7 @@ use crate::system_contracts::{SystemContract, SLASH_CONTRACT};
 
 impl<Spec: EthChainSpec> SystemContract<Spec> {
     /// Build a `slash(address)` system‐transaction targeting the on-chain slash contract.
+    #[allow(dead_code)]
     pub fn slash_tx(&self, spoiled: Address) -> TransactionSigned {
         sol!(
             function slash(address);

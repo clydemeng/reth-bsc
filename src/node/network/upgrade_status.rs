@@ -1,7 +1,7 @@
 //! Implement BSC upgrade message which is required during handshake with other BSC clients, e.g.,
 //! geth.
-use alloy_rlp::{Decodable, Encodable, RlpDecodable, RlpEncodable};
-use bytes::{Buf, BufMut, Bytes, BytesMut};
+use alloy_rlp::{Decodable, Encodable};
+use bytes::{BufMut, Bytes, BytesMut};
 
 /// The message id for the upgrade status message, used in the BSC handshake.
 const UPGRADE_STATUS_MESSAGE_ID: u8 = 0x0b;

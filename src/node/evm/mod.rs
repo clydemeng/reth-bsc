@@ -4,7 +4,6 @@ use crate::{
         transaction::BscTxEnv,
     },
     hardforks::bsc::BscHardfork,
-    node::BscNode,
 };
 use alloy_primitives::{Address, Bytes};
 

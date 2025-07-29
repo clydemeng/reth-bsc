@@ -135,7 +135,7 @@ where
         Ok(())
     }
 
-    /// Recover proposer address from header seal
+    #[allow(dead_code)]
     fn recover_proposer(&self, header: &SealedHeader) -> Result<Address, ConsensusError> {
         // For now, use a simplified approach - the actual seal verification
         // is already implemented in the header validator
@@ -146,7 +146,7 @@ where
         Ok(header.beneficiary())
     }
     
-    /// Recover proposer address from header seal (ECDSA signature recovery)
+    #[allow(dead_code)]
     fn recover_proposer_from_seal(&self, header: &SealedHeader) -> Result<Address, ConsensusError> {
         use secp256k1::{ecdsa::{RecoverableSignature, RecoveryId}, Message, SECP256K1};
         

@@ -53,7 +53,6 @@ impl SnapshotProvider for InMemorySnapshotProvider {
 
 use reth_db::{Database, DatabaseError};
 use reth_db::table::{Compress, Decompress};
-use reth_db::models::ParliaSnapshotBlob;
 use reth_db::transaction::{DbTx, DbTxMut};
 use reth_db::cursor::DbCursorRO;
 use schnellru::{ByLength, LruMap};
@@ -75,13 +74,12 @@ impl<DB: Database> DbSnapshotProvider<DB> {
 
     fn load_from_db(&self, block_number: u64) -> Option<Snapshot> {
         let tx = self.db.tx().ok()?;
-        let mut cursor = tx
-            .cursor_read::<crate::consensus::parlia::db::ParliaSnapshots>()
+        let mut cursor = tx.cursor_read::<crate::consensus::parlia::db::ParliaSnapshots>()
             .ok()?;
         let mut iter = cursor.walk_range(..=block_number).ok()?;
         let mut last: Option<Snapshot> = None;
         while let Some(Ok((_, raw_blob))) = iter.next() {
-            let raw = &raw_blob.0;
+            let raw = &raw_blob;
             if let Ok(decoded) = Snapshot::decompress(raw) {
                 last = Some(decoded);
             }
@@ -90,8 +88,8 @@ impl<DB: Database> DbSnapshotProvider<DB> {
     }
 
     fn persist_to_db(&self, snap: &Snapshot) -> Result<(), DatabaseError> {
-        let mut tx = self.db.tx_mut()?;
-        tx.put::<crate::consensus::parlia::db::ParliaSnapshots>(snap.block_number, ParliaSnapshotBlob(snap.clone().compress()))?;
+        let tx = self.db.tx_mut()?;
+        tx.put::<crate::consensus::parlia::db::ParliaSnapshots>(snap.block_number, snap.clone().compress())?;
         tx.commit()?;
         Ok(())
     }

@@ -193,7 +193,8 @@ where
                 block_number: header.number(),
             });
         }
-        if header.timestamp() <= parent.timestamp() {
+        // Maxwell hard-fork relaxation: equal timestamps are allowed.
+        if header.timestamp() < parent.timestamp() {
             return Err(ConsensusError::TimestampIsInPast {
                 parent_timestamp: parent.timestamp(),
                 timestamp: header.timestamp(),
@@ -359,7 +360,7 @@ where
             // use reth_execution_types::snapshot_pool;
             if new_snap.block_number % super::snapshot::CHECKPOINT_INTERVAL == 0 {
                 let blob = new_snap.clone().compress();
-                // snapshot_pool::push((new_snap.block_number, blob));
+                crate::snapshot_pool::push((new_snap.block_number, blob));
             }
         }
 

@@ -4,7 +4,7 @@ use super::patch::{
     patch_chapel_after_tx,
     patch_chapel_before_tx,
 };
-use crate::consensus::parlia::{HertzPatchManager, StoragePatch};
+use crate::consensus::parlia::HertzPatchManager;
 use crate::{
     consensus::{MAX_SYSTEM_REWARD, SYSTEM_ADDRESS, SYSTEM_REWARD_PERCENT},
     evm::transaction::BscTxEnv,
@@ -59,6 +59,7 @@ where
     /// System contracts used to trigger fork specific logic.
     system_contracts: SystemContract<Spec>,
     /// Hertz patch manager for mainnet compatibility
+    #[allow(dead_code)]
     hertz_patch_manager: HertzPatchManager,
     /// Context for block execution.
     _ctx: EthBlockExecutionCtx<'a>,
@@ -241,6 +242,7 @@ where
     }
 
     /// Handle slash system tx
+    #[allow(dead_code)]
     fn handle_slash_tx(&mut self, tx: &TransactionSigned) -> Result<(), BlockExecutionError> {
         sol!(
             function slash(
