@@ -54,15 +54,9 @@ pub fn head() -> Head {
     Head { number: 40_000_000, timestamp: 1751250600, ..Default::default() }
 }
 
-pub fn current_head() -> Head {
-    // ACTUAL BSC mainnet state as of July 19, 2025
-    // Block: 54,522,626, Timestamp: 1752889876 (2025-07-19 01:51:16 UTC)
-    Head { number: 54_522_626, timestamp: 1752889876, ..Default::default() }
-}
-
 #[cfg(test)]
 mod tests {
-    use crate::chainspec::bsc::{bsc_mainnet, head, current_head};
+    use crate::chainspec::bsc::{bsc_mainnet, head};
     use alloy_primitives::hex;
     use reth_chainspec::{ForkHash, ForkId};
 
@@ -74,16 +68,5 @@ mod tests {
 
         let fork_id = bsc_mainnet().fork_id(&head());
         assert_eq!(fork_id, expected_f_id);
-    }
-
-    #[test]
-    fn current_mainnet_forkid() {
-        let fork_id = bsc_mainnet().fork_id(&current_head());
-        println!("Current BSC mainnet fork ID: {:?}", fork_id);
-        
-        // Convert to hex for easier comparison
-        let hash_bytes = fork_id.hash.0;
-        let hash_hex = hex::encode(hash_bytes);
-        println!("Current fork ID as hex: {}", hash_hex);
     }
 }
