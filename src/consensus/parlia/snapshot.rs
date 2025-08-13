@@ -112,14 +112,14 @@ impl Snapshot {
         }
     }
 
-    /// Apply `next_header` (proposed by `validator`) plus any epoch changes to produce a new snapshot.
+    /// Apply the next block to the snapshot
     #[allow(clippy::too_many_arguments)]
     pub fn apply<H, ChainSpec>(
         &self,
         validator: Address,
         next_header: &H,
         mut new_validators: Vec<Address>,
-        vote_addrs: Option<Vec<VoteAddress>>, // for epoch switch
+        vote_addrs: Option<Vec<VoteAddress>>,
         attestation: Option<VoteAttestation>,
         turn_length: Option<u8>,
         chain_spec: &ChainSpec,
@@ -153,17 +153,18 @@ impl Snapshot {
         let is_bohr = chain_spec.is_bohr_active_at_timestamp(header_timestamp);
         if is_bohr {
             if snap.sign_recently(validator) {
-                tracing::warn!("🔍 snap-debug [BSC] after bohr, validator over-proposed, validator: {:?}, block_number: {:?}", validator, block_number);
+                tracing::warn!("Failed to apply block due to over-proposed, validator: {:?}, block_number: {:?}", validator, block_number);
                 return None;
             }
         } else {
             for (_, &v) in &snap.recent_proposers {
                 if v == validator {
-                    tracing::warn!("🔍 snap-debug [BSC] before bohr, validator over-proposed, validator: {:?}, block_number: {:?}", validator, block_number);
+                    tracing::warn!("Failed to apply block due to over-proposed, validator: {:?}, block_number: {:?}", validator, block_number);
                     return None;
                 }
             }
         }
+        snap.update_attestation(next_header, attestation);
         snap.recent_proposers.insert(block_number, validator);
 
         let is_maxwell_active = chain_spec.is_maxwell_active_at_timestamp(header_timestamp);
@@ -203,13 +204,15 @@ impl Snapshot {
             if let Some(tl) = turn_length { snap.turn_length = Some(tl) }
 
             if is_bohr {
+                // BEP-404: Clear Miner History when Switching Validators Set
                 snap.recent_proposers = Default::default();
                 snap.recent_proposers.insert(epoch_key, Address::default());
             } else {
-                let new_limit = (new_validators.len() / 2 + 1) as u64;
-                if new_limit < limit {
-                    for i in 0..(limit - new_limit) {
-                        snap.recent_proposers.remove(&(block_number - new_limit - i));
+                let old_limit = (snap.validators.len() / 2 + 1) as usize;
+                let new_limit = (new_validators.len() / 2 + 1) as usize;
+                if new_limit < old_limit {
+                    for i in 0..(old_limit - new_limit) {
+                        snap.recent_proposers.remove(&(block_number as u64 - new_limit as u64 - i as u64));
                     }
                 }
             }
@@ -232,10 +235,27 @@ impl Snapshot {
             snap.validators = new_validators;
             snap.validators_map = validators_map;
         }
-
-        if let Some(att) = attestation { snap.vote_data = att.data; }
-
         Some(snap)
+    }
+
+    pub fn update_attestation<H>(&mut self, header: &H, attestation: Option<VoteAttestation>)
+    where
+        H: alloy_consensus::BlockHeader + alloy_primitives::Sealable,
+    {
+        if let Some(att) = attestation {
+            let target_number = att.data.target_number;
+            let target_hash = att.data.target_hash;
+            if target_number+1 != header.number() || target_hash != header.parent_hash() {
+                tracing::warn!("Failed to update attestation, target_number: {:?}, target_hash: {:?}, header_number: {:?}, header_parent_hash: {:?}", target_number, target_hash, header.number(), header.parent_hash());
+                return;
+            }
+            if att.data.source_number+1 != att.data.target_number {
+                self.vote_data.target_number = att.data.target_number;
+                self.vote_data.target_hash = att.data.target_hash;
+            } else {
+                self.vote_data = att.data;
+            }
+        }
     }
 
     /// Returns `true` if `proposer` is in-turn according to snapshot rules.
@@ -301,7 +321,10 @@ impl Snapshot {
     pub fn sign_recently_by_counts(&self, validator: Address, counts: &HashMap<Address, u8>) -> bool {
         if let Some(&times) = counts.get(&validator) {
             let allowed = u64::from(self.turn_length.unwrap_or(1));
-            if u64::from(times) >= allowed { return true; }
+            if u64::from(times) >= allowed { 
+                tracing::warn!("Recently signed, validator: {:?}, block_number: {:?}, times: {:?}, allowed: {:?}", validator, self.block_number, times, allowed);
+                return true; 
+            }
         }
         false
     }

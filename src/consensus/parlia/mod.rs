@@ -18,6 +18,7 @@ pub mod hooks;
 pub mod slash_pool;
 pub mod transaction_splitter;
 pub mod consensus;
+pub mod util;
 
 pub use snapshot::{Snapshot, ValidatorInfo, CHECKPOINT_INTERVAL};
 pub use vote::{VoteAddress, VoteAttestation, VoteData, VoteEnvelope, VoteSignature, ValidatorsBitSet};
@@ -29,6 +30,7 @@ pub use validation::BscConsensusValidator;
 pub use hertz_patch::{HertzPatchManager, StoragePatch};
 pub use transaction_splitter::{TransactionSplitter, SplitTransactions, TransactionSplitterError};
 pub use consensus::ParliaConsensus;
+pub use util::hash_with_chain_id;
 
 /// Epoch length (200 blocks on BSC main-net).
 pub const EPOCH: u64 = 200;

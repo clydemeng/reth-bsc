@@ -134,14 +134,11 @@ where
 
         Ok(())
     }
-
-
     
     /// Recover proposer address from header seal (ECDSA signature recovery)
     /// Following bsc-erigon's approach exactly
     pub fn recover_proposer_from_seal(&self, header: &SealedHeader) -> Result<Address, ConsensusError> {
         use secp256k1::{ecdsa::{RecoverableSignature, RecoveryId}, Message, SECP256K1};
-        
         // Extract seal from extra data (last 65 bytes) - matching bsc-erigon extraSeal
         let extra_data = &header.extra_data();
         if extra_data.len() < 65 {
@@ -149,26 +146,20 @@ where
         }
         
         let signature = &extra_data[extra_data.len() - 65..];
-        
-        // Create the seal hash for signature verification (matching bsc-erigon's SealHash)
-        let seal_hash = self.calculate_seal_hash(header);
-        let message = Message::from_digest(seal_hash.0);
-        
         // Parse signature: 64 bytes + 1 recovery byte
         if signature.len() != 65 {
             return Err(ConsensusError::Other(format!("Invalid signature length: expected 65, got {}", signature.len()).into()));
         }
-        
         let sig_bytes = &signature[..64];
         let recovery_id = signature[64];
-        
-        // Handle recovery ID (bsc-erigon compatible)
         let recovery_id = RecoveryId::from_i32(recovery_id as i32)
             .map_err(|_| ConsensusError::Other("Invalid recovery ID".into()))?;
             
         let recoverable_sig = RecoverableSignature::from_compact(sig_bytes, recovery_id)
             .map_err(|_| ConsensusError::Other("Invalid signature format".into()))?;
         
+        let seal_hash = crate::consensus::parlia::hash_with_chain_id(header, self.chain_spec.chain().id());
+        let message = Message::from_digest(seal_hash.0);
         // Recover public key and derive address (matching bsc-erigon's crypto.Keccak256)
         let public_key = SECP256K1.recover_ecdsa(&message, &recoverable_sig)
             .map_err(|_| ConsensusError::Other("Failed to recover public key".into()))?;
@@ -182,108 +173,6 @@ where
         Ok(address)
     }
     
-    /// Calculate seal hash for BSC headers (matching bsc-erigon's EncodeSigHeader exactly)
-    fn calculate_seal_hash(&self, header: &SealedHeader) -> alloy_primitives::B256 {
-        use alloy_primitives::keccak256;
-        
-        // Use the exact same approach as bsc-erigon's EncodeSigHeader
-        const EXTRA_SEAL: usize = 65;
-        
-        let chain_id = self.chain_spec.chain().id();
-        let extra_data = &header.extra_data();
-        
-        // Extract extra data without the seal (matching bsc-erigon line 1761)
-        let extra_without_seal = if extra_data.len() >= EXTRA_SEAL {
-            &extra_data[..extra_data.len() - EXTRA_SEAL]
-        } else {
-            extra_data
-        };
-        
-        // Encode directly as slice like bsc-erigon does (NOT using SealContent struct)
-        // This matches bsc-erigon's EncodeSigHeader function exactly
-        
-        // manual field-by-field encoding
-        // This matches reth-bsc-trail's encode_header_with_chain_id function exactly
-        use alloy_rlp::Encodable;
-        use alloy_primitives::{bytes::BytesMut, U256};
-        
-        let mut out = BytesMut::new();
-        
-        // First encode the RLP list header (like reth-bsc-trail's rlp_header function)
-        let mut rlp_head = alloy_rlp::Header { list: true, payload_length: 0 };
-        
-        // Calculate payload length for all fields
-        rlp_head.payload_length += U256::from(chain_id).length();
-        rlp_head.payload_length += header.parent_hash().length();
-        rlp_head.payload_length += header.ommers_hash().length();
-        rlp_head.payload_length += header.beneficiary().length();
-        rlp_head.payload_length += header.state_root().length();
-        rlp_head.payload_length += header.transactions_root().length();
-        rlp_head.payload_length += header.receipts_root().length();
-        rlp_head.payload_length += header.logs_bloom().length();
-        rlp_head.payload_length += header.difficulty().length();
-        rlp_head.payload_length += U256::from(header.number()).length();
-        rlp_head.payload_length += header.gas_limit().length();
-        rlp_head.payload_length += header.gas_used().length();
-        rlp_head.payload_length += header.timestamp().length();
-        rlp_head.payload_length += extra_without_seal.length();
-        rlp_head.payload_length += header.mix_hash().unwrap_or_default().length();
-        rlp_head.payload_length += header.nonce().unwrap_or_default().length();
-       
-        // Add conditional field lengths for post-4844 blocks (exactly like reth-bsc-trail)
-        if header.parent_beacon_block_root().is_some() &&
-            header.parent_beacon_block_root().unwrap() == alloy_primitives::B256::ZERO
-        {
-            rlp_head.payload_length += U256::from(header.base_fee_per_gas().unwrap_or_default()).length();
-            rlp_head.payload_length += header.withdrawals_root().unwrap_or_default().length();
-            rlp_head.payload_length += header.blob_gas_used().unwrap_or_default().length();
-            rlp_head.payload_length += header.excess_blob_gas().unwrap_or_default().length();
-            rlp_head.payload_length += header.parent_beacon_block_root().unwrap().length();
-            if header.requests_hash().is_some() {
-                rlp_head.payload_length += header.requests_hash().unwrap().length();
-            }
-        }
-        
-        // Encode the RLP list header first
-        rlp_head.encode(&mut out);
-        
-        // Then encode each field individually (exactly like reth-bsc-trail)
-        Encodable::encode(&U256::from(chain_id), &mut out);
-        Encodable::encode(&header.parent_hash(), &mut out);
-        Encodable::encode(&header.ommers_hash(), &mut out);
-        Encodable::encode(&header.beneficiary(), &mut out);
-        Encodable::encode(&header.state_root(), &mut out);
-        Encodable::encode(&header.transactions_root(), &mut out);
-        Encodable::encode(&header.receipts_root(), &mut out);
-        Encodable::encode(&header.logs_bloom(), &mut out);
-        Encodable::encode(&header.difficulty(), &mut out);
-        Encodable::encode(&U256::from(header.number()), &mut out);
-        Encodable::encode(&header.gas_limit(), &mut out);
-        Encodable::encode(&header.gas_used(), &mut out);
-        Encodable::encode(&header.timestamp(), &mut out);
-        Encodable::encode(&extra_without_seal, &mut out);
-        Encodable::encode(&header.mix_hash().unwrap_or_default(), &mut out);
-        Encodable::encode(&header.nonce().unwrap_or_default(), &mut out);
-        
-        // Add conditional fields for post-4844 blocks 
-        if header.parent_beacon_block_root().is_some() &&
-            header.parent_beacon_block_root().unwrap() == alloy_primitives::B256::ZERO
-        {
-            Encodable::encode(&U256::from(header.base_fee_per_gas().unwrap_or_default()), &mut out);
-            Encodable::encode(&header.withdrawals_root().unwrap_or_default(), &mut out);
-            Encodable::encode(&header.blob_gas_used().unwrap_or_default(), &mut out);
-            Encodable::encode(&header.excess_blob_gas().unwrap_or_default(), &mut out);
-            Encodable::encode(&header.parent_beacon_block_root().unwrap(), &mut out);
-            if header.requests_hash().is_some() {
-                Encodable::encode(&header.requests_hash().unwrap(), &mut out);
-            }
-        }
-        
-        let encoded = out.to_vec();
-        let result = keccak256(&encoded);
-        
-        result
-    }
 }
 
 /// Post-execution validation logic
