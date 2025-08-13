@@ -12,10 +12,6 @@ path = "src/lib.rs"
 name = "reth-bsc"
 path = "src/main.rs"
 
-[[bin]]
-name = "snapshot-checker"
-path = "src/bin/snapshot_checker.rs"
-
 [dependencies]
 reth = { git = "https://github.com/clydemeng/reth.git", branch = "parlia-6487f0b-simplified" }
 reth-cli = { git = "https://github.com/clydemeng/reth.git", branch = "parlia-6487f0b-simplified" }
@@ -179,6 +175,9 @@ client = [
 # E2E test-suite support
 reth-e2e-test-utils = { git = "https://github.com/clydemeng/reth.git", branch = "parlia-6487f0b-simplified" }
 # (all other reth crates are pulled in automatically via workspace deps)
+
+# For unit tests
+uuid = { version = "1.0", features = ["v4"] }
 
 
 [profile.release]

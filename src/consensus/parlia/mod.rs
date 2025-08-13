@@ -54,4 +54,7 @@ impl StepSigner {
 // The real trait impls (HeaderValidator, Consensus, FullConsensus) will be
 // added in a later milestone. For now we only ensure the module compiles.
 
-pub mod db; 
+pub mod db;
+
+#[cfg(test)]
+mod tests; 
