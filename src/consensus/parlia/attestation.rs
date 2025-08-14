@@ -3,7 +3,7 @@ use super::vote::VoteAttestation;
 use alloy_consensus::BlockHeader as BlockHeaderTrait;
 
 /// Extract the `VoteAttestation` bytes slice from `header.extra_data` if present and decode.
-///
+/// This implementation is based on the `getVoteAttestationFromHeader` function in `parlia.go` of `bsc-erigon`.
 /// * `epoch_len` – current epoch length (200/500/1000) so we can determine if block is an epoch boundary.
 /// * `is_luban` – true once Luban hard-fork active (extraData format changes).
 /// * `is_bohr`  – true once Bohr hard-fork active (turnLength byte present).

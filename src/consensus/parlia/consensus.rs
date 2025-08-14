@@ -1,6 +1,6 @@
 use super::{ParliaHeaderValidator, SnapshotProvider, BscConsensusValidator, Snapshot, TransactionSplitter, SplitTransactions, constants::{DIFF_INTURN, DIFF_NOTURN}};
 use alloy_consensus::{Header, TxReceipt, Transaction, BlockHeader};
-use reth_primitives_traits::SignerRecoverable;
+use reth_primitives_traits::{GotExpected, SignerRecoverable};
 use crate::{
     node::primitives::BscBlock,
     hardforks::BscHardforks,
@@ -72,28 +72,15 @@ where
 
     /// Validate block pre-execution using Parlia rules
     fn validate_block_pre_execution_impl(&self, block: &SealedBlock<BscBlock>) -> Result<(), ConsensusError> {
-        let header = block.header();
-
-        // Skip genesis block
-        if header.number == 0 {
-            return Ok(());
+        // Check transaction root
+        if let Err(error) = block.ensure_transaction_root_valid() {
+            return Err(ConsensusError::BodyTransactionRootDiff(error.into()));
         }
 
-        // 1. Basic block validation (similar to standard pre-execution)
-        self.validate_basic_block_fields(block)?;
-
-        // 2. BSC-specific Parlia validation
-        // 
-        // IMPORTANT: Following reth-bsc-trail's approach, we skip ALL BSC-specific validation
-        // during Bodies stage (pre-execution). BSC validation requires snapshots which
-        // may not be available during out-of-order Bodies processing.
-        //
-        // Like reth-bsc-trail, we defer ALL BSC validation to the Execution stage where 
-        // blocks are processed in proper sequence and dependencies are guaranteed.
-        //
-        // This prevents "Invalid difficulty" and "Unauthorized proposer" errors 
-        // during Bodies download validation.
-        tracing::trace!("BSC pre-execution validation deferred to execution stage (like reth-bsc-trail)");
+        // EIP-4844: Blob gas validation for Cancun fork
+        if BscHardforks::is_cancun_active_at_timestamp(self.chain_spec.as_ref(), block.timestamp) {
+            self.validate_cancun_blob_gas(block)?;
+        }
 
         Ok(())
     }
@@ -171,25 +158,6 @@ where
         tracing::debug!("📋 [BSC] Parsed {} validators from genesis extraData", validators.len());
         Ok(validators)
     }
-
-
-
-    /// Validate basic block fields (transaction root, blob gas, etc.)
-    fn validate_basic_block_fields(&self, block: &SealedBlock<BscBlock>) -> Result<(), ConsensusError> {
-        // Check transaction root
-        if let Err(error) = block.ensure_transaction_root_valid() {
-            return Err(ConsensusError::BodyTransactionRootDiff(error.into()));
-        }
-
-        // EIP-4844: Blob gas validation for Cancun fork
-        if BscHardforks::is_cancun_active_at_timestamp(self.chain_spec.as_ref(), block.timestamp) {
-            self.validate_cancun_blob_gas(block)?;
-        }
-
-        Ok(())
-    }
-
-
 
     /// Validate block post-execution using Parlia rules
     fn validate_block_post_execution_impl(
@@ -378,15 +346,18 @@ where
 
     /// Validate EIP-4844 blob gas fields for Cancun fork
     fn validate_cancun_blob_gas(&self, block: &SealedBlock<BscBlock>) -> Result<(), ConsensusError> {
-        // Check that blob gas used field exists in header for Cancun fork
-        if block.header().blob_gas_used.is_none() {
-            return Err(ConsensusError::Other("Blob gas used missing in Cancun block".into()));
+        // Check that the blob gas used in the header matches the sum of the blob gas used by each
+        // blob tx
+        let header_blob_gas_used = block.blob_gas_used.ok_or(ConsensusError::BlobGasUsedMissing)?;
+        let total_blob_gas = block.blob_gas_used().ok_or(ConsensusError::BlobGasUsedMissing)?;
+        // TODO: please use the following correct line after block.body().blob_gas_used() is callable in scope. It should be usealbe when next reht==th dependency updates
+        // let total_blob_gas = block.body().blob_gas_used().ok_or(ConsensusError::BlobGasUsedMissing)?;
+        if total_blob_gas != header_blob_gas_used {
+            return Err(ConsensusError::BlobGasUsedDiff(GotExpected {
+                got: header_blob_gas_used,
+                expected: total_blob_gas,
+            }));
         }
-
-        // TODO: Implement detailed blob gas validation
-        // This would check that the blob gas used in the header matches the sum of blob gas used by transactions
-        // For now, we just verify the field exists
-
         Ok(())
     }
 

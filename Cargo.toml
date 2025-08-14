@@ -13,47 +13,47 @@ name = "reth-bsc"
 path = "src/main.rs"
 
 [dependencies]
-reth = { git = "https://github.com/clydemeng/reth.git", branch = "parlia-6487f0b-simplified" }
-reth-cli = { git = "https://github.com/clydemeng/reth.git", branch = "parlia-6487f0b-simplified" }
-reth-cli-commands = { git = "https://github.com/clydemeng/reth.git", branch = "parlia-6487f0b-simplified" }
-reth-basic-payload-builder = { git = "https://github.com/clydemeng/reth.git", branch = "parlia-6487f0b-simplified" }
-reth-db = { git = "https://github.com/clydemeng/reth.git", branch = "parlia-6487f0b-simplified" }
-reth-engine-local = { git = "https://github.com/clydemeng/reth.git", branch = "parlia-6487f0b-simplified" }
-reth-chainspec = { git = "https://github.com/clydemeng/reth.git", branch = "parlia-6487f0b-simplified" }
-reth-cli-util = { git = "https://github.com/clydemeng/reth.git", branch = "parlia-6487f0b-simplified" }
-reth-discv4 = { git = "https://github.com/clydemeng/reth.git", branch = "parlia-6487f0b-simplified", features = ["test-utils"] }
-reth-engine-primitives = { git = "https://github.com/clydemeng/reth.git", branch = "parlia-6487f0b-simplified" }
-reth-ethereum-forks = { git = "https://github.com/clydemeng/reth.git", branch = "parlia-6487f0b-simplified", features = ["serde"] }
-reth-ethereum-payload-builder = { git = "https://github.com/clydemeng/reth.git", branch = "parlia-6487f0b-simplified" }
-reth-ethereum-primitives = { git = "https://github.com/clydemeng/reth.git", branch = "parlia-6487f0b-simplified" }
-reth-eth-wire = { git = "https://github.com/clydemeng/reth.git", branch = "parlia-6487f0b-simplified" }
-reth-eth-wire-types = { git = "https://github.com/clydemeng/reth.git", branch = "parlia-6487f0b-simplified" }
-reth-evm = { git = "https://github.com/clydemeng/reth.git", branch = "parlia-6487f0b-simplified" }
-reth-evm-ethereum = { git = "https://github.com/clydemeng/reth.git", branch = "parlia-6487f0b-simplified" }
+reth = { git = "https://github.com/clydemeng/reth.git", branch = "6487f0b-bsc-patch" }
+reth-cli = { git = "https://github.com/clydemeng/reth.git", branch = "6487f0b-bsc-patch" }
+reth-cli-commands = { git = "https://github.com/clydemeng/reth.git", branch = "6487f0b-bsc-patch" }
+reth-basic-payload-builder = { git = "https://github.com/clydemeng/reth.git", branch = "6487f0b-bsc-patch" }
+reth-db = { git = "https://github.com/clydemeng/reth.git", branch = "6487f0b-bsc-patch" }
+reth-engine-local = { git = "https://github.com/clydemeng/reth.git", branch = "6487f0b-bsc-patch" }
+reth-chainspec = { git = "https://github.com/clydemeng/reth.git", branch = "6487f0b-bsc-patch" }
+reth-cli-util = { git = "https://github.com/clydemeng/reth.git", branch = "6487f0b-bsc-patch" }
+reth-discv4 = { git = "https://github.com/clydemeng/reth.git", branch = "6487f0b-bsc-patch", features = ["test-utils"] }
+reth-engine-primitives = { git = "https://github.com/clydemeng/reth.git", branch = "6487f0b-bsc-patch" }
+reth-ethereum-forks = { git = "https://github.com/clydemeng/reth.git", branch = "6487f0b-bsc-patch", features = ["serde"] }
+reth-ethereum-payload-builder = { git = "https://github.com/clydemeng/reth.git", branch = "6487f0b-bsc-patch" }
+reth-ethereum-primitives = { git = "https://github.com/clydemeng/reth.git", branch = "6487f0b-bsc-patch" }
+reth-eth-wire = { git = "https://github.com/clydemeng/reth.git", branch = "6487f0b-bsc-patch" }
+reth-eth-wire-types = { git = "https://github.com/clydemeng/reth.git", branch = "6487f0b-bsc-patch" }
+reth-evm = { git = "https://github.com/clydemeng/reth.git", branch = "6487f0b-bsc-patch" }
+reth-evm-ethereum = { git = "https://github.com/clydemeng/reth.git", branch = "6487f0b-bsc-patch" }
 # reth-execution-types = { git = "https://github.com/clydemeng/reth.git", branch = "extend-8e0ff926b" }
-reth-transaction-pool = { git = "https://github.com/clydemeng/reth.git", branch = "parlia-6487f0b-simplified" }
-reth-node-core = { git = "https://github.com/clydemeng/reth.git", branch = "parlia-6487f0b-simplified" }
-reth-node-api = { git = "https://github.com/clydemeng/reth.git", branch = "parlia-6487f0b-simplified" }
-reth-node-builder = { git = "https://github.com/clydemeng/reth.git", branch = "parlia-6487f0b-simplified" }
-reth-payload-builder = { git = "https://github.com/clydemeng/reth.git", branch = "parlia-6487f0b-simplified" }
-reth-revm = { git = "https://github.com/clydemeng/reth.git", branch = "parlia-6487f0b-simplified" }
-reth-network = { git = "https://github.com/clydemeng/reth.git", branch = "parlia-6487f0b-simplified", features = ["test-utils"] }
-reth-network-p2p = { git = "https://github.com/clydemeng/reth.git", branch = "parlia-6487f0b-simplified" }
-reth-network-api = { git = "https://github.com/clydemeng/reth.git", branch = "parlia-6487f0b-simplified" }
-reth-node-ethereum = { git = "https://github.com/clydemeng/reth.git", branch = "parlia-6487f0b-simplified", features = ["test-utils"] }
-reth-network-peers = { git = "https://github.com/clydemeng/reth.git", branch = "parlia-6487f0b-simplified" }
-reth-payload-primitives = { git = "https://github.com/clydemeng/reth.git", branch = "parlia-6487f0b-simplified" }
-reth-primitives = { git = "https://github.com/clydemeng/reth.git", branch = "parlia-6487f0b-simplified" }
-reth-primitives-traits = { git = "https://github.com/clydemeng/reth.git", branch = "parlia-6487f0b-simplified" }
-reth-provider = { git = "https://github.com/clydemeng/reth.git", branch = "parlia-6487f0b-simplified", features = ["test-utils"] }
-reth-rpc-eth-api = { git = "https://github.com/clydemeng/reth.git", branch = "parlia-6487f0b-simplified" }
-reth-rpc-engine-api = { git = "https://github.com/clydemeng/reth.git", branch = "parlia-6487f0b-simplified" }
-reth-rpc-api = { git = "https://github.com/clydemeng/reth.git", branch = "parlia-6487f0b-simplified" }
-reth-tracing = { git = "https://github.com/clydemeng/reth.git", branch = "parlia-6487f0b-simplified" }
-reth-trie-common = { git = "https://github.com/clydemeng/reth.git", branch = "parlia-6487f0b-simplified" }
-reth-trie-db = { git = "https://github.com/clydemeng/reth.git", branch = "parlia-6487f0b-simplified" }
-reth-rpc = { git = "https://github.com/clydemeng/reth.git", branch = "parlia-6487f0b-simplified" }
-reth-optimism-rpc = { git = "https://github.com/clydemeng/reth.git", branch = "parlia-6487f0b-simplified" }
+reth-transaction-pool = { git = "https://github.com/clydemeng/reth.git", branch = "6487f0b-bsc-patch" }
+reth-node-core = { git = "https://github.com/clydemeng/reth.git", branch = "6487f0b-bsc-patch" }
+reth-node-api = { git = "https://github.com/clydemeng/reth.git", branch = "6487f0b-bsc-patch" }
+reth-node-builder = { git = "https://github.com/clydemeng/reth.git", branch = "6487f0b-bsc-patch" }
+reth-payload-builder = { git = "https://github.com/clydemeng/reth.git", branch = "6487f0b-bsc-patch" }
+reth-revm = { git = "https://github.com/clydemeng/reth.git", branch = "6487f0b-bsc-patch" }
+reth-network = { git = "https://github.com/clydemeng/reth.git", branch = "6487f0b-bsc-patch", features = ["test-utils"] }
+reth-network-p2p = { git = "https://github.com/clydemeng/reth.git", branch = "6487f0b-bsc-patch" }
+reth-network-api = { git = "https://github.com/clydemeng/reth.git", branch = "6487f0b-bsc-patch" }
+reth-node-ethereum = { git = "https://github.com/clydemeng/reth.git", branch = "6487f0b-bsc-patch", features = ["test-utils"] }
+reth-network-peers = { git = "https://github.com/clydemeng/reth.git", branch = "6487f0b-bsc-patch" }
+reth-payload-primitives = { git = "https://github.com/clydemeng/reth.git", branch = "6487f0b-bsc-patch" }
+reth-primitives = { git = "https://github.com/clydemeng/reth.git", branch = "6487f0b-bsc-patch" }
+reth-primitives-traits = { git = "https://github.com/clydemeng/reth.git", branch = "6487f0b-bsc-patch" }
+reth-provider = { git = "https://github.com/clydemeng/reth.git", branch = "6487f0b-bsc-patch", features = ["test-utils"] }
+reth-rpc-eth-api = { git = "https://github.com/clydemeng/reth.git", branch = "6487f0b-bsc-patch" }
+reth-rpc-engine-api = { git = "https://github.com/clydemeng/reth.git", branch = "6487f0b-bsc-patch" }
+reth-rpc-api = { git = "https://github.com/clydemeng/reth.git", branch = "6487f0b-bsc-patch" }
+reth-tracing = { git = "https://github.com/clydemeng/reth.git", branch = "6487f0b-bsc-patch" }
+reth-trie-common = { git = "https://github.com/clydemeng/reth.git", branch = "6487f0b-bsc-patch" }
+reth-trie-db = { git = "https://github.com/clydemeng/reth.git", branch = "6487f0b-bsc-patch" }
+reth-rpc = { git = "https://github.com/clydemeng/reth.git", branch = "6487f0b-bsc-patch" }
+reth-optimism-rpc = { git = "https://github.com/clydemeng/reth.git", branch = "6487f0b-bsc-patch" }
 
 revm = "27.0.3"
 
@@ -173,7 +173,7 @@ client = [
 
 [dev-dependencies]
 # E2E test-suite support
-reth-e2e-test-utils = { git = "https://github.com/clydemeng/reth.git", branch = "parlia-6487f0b-simplified" }
+reth-e2e-test-utils = { git = "https://github.com/clydemeng/reth.git", branch = "6487f0b-bsc-patch" }
 # (all other reth crates are pulled in automatically via workspace deps)
 
 # For unit tests
