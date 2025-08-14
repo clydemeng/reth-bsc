@@ -28,7 +28,6 @@ use std::sync::Arc;
 use tokio::sync::{oneshot, Mutex};
 
 pub mod consensus;
-pub mod consensus_factory;
 pub mod engine;
 pub mod engine_api;
 pub mod evm;

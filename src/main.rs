@@ -1,9 +1,8 @@
 use clap::{Args, Parser};
-use reth::{builder::NodeHandle, cli::Cli};
+use reth::{builder::NodeHandle, cli::Cli, consensus::noop::NoopConsensus};
 use reth_bsc::{
     chainspec::parser::BscChainSpecParser,
     node::{evm::config::BscEvmConfig, BscNode},
-    consensus::parlia::{ParliaConsensus, EPOCH},
 };
 use std::sync::Arc;
 
@@ -27,17 +26,8 @@ fn main() -> eyre::Result<()> {
 
     Cli::<BscChainSpecParser, NoArgs>::parse().run_with_components::<BscNode>(
         |spec| {
-            // Create components: (EVM config, Consensus)
-            // Note: Consensus will be created by BscConsensusBuilder with correct datadir
-            let evm_config = BscEvmConfig::new(spec.clone());
-            
-            // Create a minimal temporary consensus for CLI components
-            // This will be replaced by BscConsensusBuilder's consensus with proper database
-            use reth_bsc::consensus::parlia::InMemorySnapshotProvider;
-            let temp_provider = Arc::new(InMemorySnapshotProvider::new(1));
-            let consensus = ParliaConsensus::new(spec, temp_provider, EPOCH);
-            
-            (evm_config, consensus)
+            // ComponentsBuilder will call BscConsensusBuilder to build the consensus.
+            (BscEvmConfig::new(spec.clone()), NoopConsensus::arc())
         },
         async move |builder, _| {
             // Create node with proper engine handle communication (matches official BSC)
@@ -46,19 +36,14 @@ fn main() -> eyre::Result<()> {
             let NodeHandle { node, node_exit_future: exit_future } =
                 builder.node(node)
                     .extend_rpc_modules(move |ctx| {
-                        // 🚀 [BSC] Register Parlia RPC API for snapshot queries
+                        tracing::info!("Start to Register Parlia RPC API: parlia_getSnapshot");
                         use reth_bsc::rpc::parlia::{ParliaApiImpl, ParliaApiServer, DynSnapshotProvider};
-
-
-                        tracing::info!("🚀 [BSC] Registering Parlia RPC API: parlia_getSnapshot");
                         
-                        // Get the snapshot provider from the global shared instance
                         let snapshot_provider = if let Some(provider) = reth_bsc::shared::get_snapshot_provider() {
-                            tracing::info!("✅ [BSC] Using shared persistent snapshot provider from consensus builder");
+                            tracing::info!("Using shared persistent snapshot provider from consensus builder");
                             provider.clone()
                         } else {
-                            // Fallback to an empty in-memory provider
-                            tracing::error!("❌ [BSC] Shared snapshot provider not available, using fallback");
+                            tracing::error!("Shared snapshot provider not available, using fallback");
                             use reth_bsc::consensus::parlia::{InMemorySnapshotProvider, SnapshotProvider};
                             Arc::new(InMemorySnapshotProvider::new(1000)) as Arc<dyn SnapshotProvider + Send + Sync>
                         };
@@ -67,7 +52,7 @@ fn main() -> eyre::Result<()> {
                         let parlia_api = ParliaApiImpl::new(wrapped_provider);
                         ctx.modules.merge_configured(parlia_api.into_rpc())?;
 
-                        tracing::info!("✅ [BSC] Parlia RPC API registered successfully!");
+                        tracing::info!("Succeed to register Parlia RPC API");
                         Ok(())
                     })
                     .launch().await?;

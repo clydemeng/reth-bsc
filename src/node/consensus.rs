@@ -24,23 +24,12 @@ where
 {
     type Consensus = Arc<dyn FullConsensus<BscPrimitives, Error = ConsensusError>>;
 
+    /// return a parlia consensus instance, automatically called by the ComponentsBuilder framework.
     async fn build_consensus(self, ctx: &BuilderContext<Node>) -> eyre::Result<Self::Consensus> {
-        // 🚀 ENABLING PERSISTENT MDBX SNAPSHOTS!
-        // We'll extract the database through the provider factory interface
-        
-
-        
-        // Always use persistent snapshots with on-demand creation - no fallback
         let snapshot_provider = try_create_ondemand_snapshots(ctx)
             .unwrap_or_else(|e| {
                 panic!("Failed to initialize on-demand MDBX snapshots: {}", e);
             });
-            
-        tracing::info!(
-            "🚀 [BSC] ON-DEMAND SNAPSHOTS ENABLED! \
-             Using OnDemandSnapshotProvider with MDBX persistence, LRU cache, and automatic snapshot creation. \
-             Snapshots will persist across node restarts and be created on-demand for missing blocks."
-        );
         
         let consensus = ParliaConsensus::new(
             ctx.chain_spec(), 
@@ -80,7 +69,7 @@ where
         DatabaseArguments::new(Default::default())
     ).map_err(|e| eyre::eyre!("Failed to initialize snapshot database: {}", e))?);
     
-    tracing::info!("📦 [BSC] Created separate database instance for persistent snapshots");
+    tracing::info!("Succeed to create a separate database instance for persistent snapshots");
     
     // Get access to the blockchain provider for header lookups
     let blockchain_provider = Arc::new(ctx.provider().clone());
@@ -93,12 +82,7 @@ where
         ctx.chain_spec().clone(),
     ));
     
-    tracing::info!("🚀 [BSC] SIMPLIFIED SNAPSHOTS ENABLED! Using optimized checkpoint-based provider with limited backward walking (reth-bsc-trail style). Fast sync performance with MDBX persistence.");
+    tracing::info!("Succeed to create EnhancedDbSnapshotProvider with backward walking capability");
     
     Ok(snapshot_provider)
 }
-
-// The old BscConsensus has been replaced with the enhanced ParliaConsensus
-// from crate::consensus::parlia::ParliaConsensus which provides proper
-// Parlia consensus validation including seal verification, turn-based proposing,
-// and epoch transition handling.
