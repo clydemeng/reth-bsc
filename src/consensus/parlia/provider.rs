@@ -4,6 +4,62 @@ use std::sync::Arc;
 use reth_provider::{HeaderProvider, BlockReader};
 use crate::chainspec::BscChainSpec;
 use crate::hardforks::BscHardforks;
+use lazy_static::lazy_static;
+
+// Global header cache to eliminate database lookups (similar to zoro_reth's RECENT_SNAPS)
+lazy_static! {
+    static ref GLOBAL_HEADER_CACHE: RwLock<schnellru::LruMap<u64, alloy_consensus::Header, schnellru::ByLength>> = 
+        RwLock::new(schnellru::LruMap::new(schnellru::ByLength::new(2000))); // Cache 2000 headers
+}
+
+/// Global header cache utilities (for debugging and monitoring)
+pub mod header_cache {
+    use super::GLOBAL_HEADER_CACHE;
+    use alloy_consensus::Header;
+    
+    /// Get cache statistics for monitoring
+    pub fn cache_stats() -> (usize, usize) {
+        let cache = GLOBAL_HEADER_CACHE.read();
+        (cache.len(), 2000) // (current_size, max_capacity)
+    }
+    
+    /// Manually insert a header into the global cache (useful for pre-loading)
+    pub fn cache_header(block_number: u64, header: Header) {
+        GLOBAL_HEADER_CACHE.write().insert(block_number, header);
+    }
+    
+    /// Clear the global cache (useful for testing)
+    pub fn clear_cache() {
+        GLOBAL_HEADER_CACHE.write().clear();
+    }
+    
+    /// Check if a header is in cache without affecting LRU order
+    pub fn has_header(block_number: u64) -> bool {
+        GLOBAL_HEADER_CACHE.read().peek(&block_number).is_some()
+    }
+    
+    /// Pre-load headers for a range of blocks (useful for batch operations)
+    pub fn preload_headers<Provider>(
+        provider: &Provider, 
+        start_block: u64, 
+        end_block: u64
+    ) -> usize 
+    where 
+        Provider: reth_provider::HeaderProvider<Header = alloy_consensus::Header> + Send + Sync,
+    {
+        let mut loaded_count = 0;
+        for block_num in start_block..=end_block {
+            if !has_header(block_num) {
+                if let Ok(Some(header)) = provider.header_by_number(block_num) {
+                    cache_header(block_num, header);
+                    loaded_count += 1;
+                }
+            }
+        }
+        tracing::debug!("🚀 Pre-loaded {} headers for range {}-{}", loaded_count, start_block, end_block);
+        loaded_count
+    }
+}
 
 
 /// Trait for creating snapshots on-demand when parent snapshots are missing
@@ -348,16 +404,44 @@ where
     }
     
     fn get_checkpoint_header(&self, block_number: u64) -> Option<alloy_consensus::Header> {
-        tracing::info!("Get checkpoint header for block {} in enhanced snapshot provider", block_number);
-        // Use the provider to fetch header from database (like reth-bsc-trail's get_header_by_hash)
+        let start_time = std::time::Instant::now();
+        
+        // 🚀 FAST PATH: Check global cache first (like zoro_reth's approach)
+        {
+            let mut cache = GLOBAL_HEADER_CACHE.write();
+            if let Some(header) = cache.get(&block_number) {
+                let elapsed = start_time.elapsed();
+                if elapsed.as_millis() > 1 { // Only log if cache lookup is unusually slow
+                    tracing::debug!("📚 Cache hit for header {}: {}μs", block_number, elapsed.as_micros());
+                }
+                return Some(header.clone());
+            }
+        }
+        
+        // 🐌 SLOW PATH: Database lookup (only when cache miss)
+        tracing::debug!("💾 Cache miss for header {}, fetching from database", block_number);
         use reth_provider::HeaderProvider;
         match self.header_provider.header_by_number(block_number) {
-            Ok(header) => {
-                tracing::info!("Succeed to fetch header{} for block {} in enhanced snapshot provider", header.is_none(),block_number);
-                header
+            Ok(Some(header)) => {
+                // Cache the result for future use
+                GLOBAL_HEADER_CACHE.write().insert(block_number, header.clone());
+                
+                let elapsed = start_time.elapsed();
+                if elapsed.as_millis() > 10 {
+                    tracing::warn!("🐌 Slow header fetch for block {}: {}ms", block_number, elapsed.as_millis());
+                } else {
+                    tracing::debug!("✅ Fetched and cached header for block {}: {}ms", block_number, elapsed.as_millis());
+                }
+                Some(header)
+            },
+            Ok(None) => {
+                let elapsed = start_time.elapsed();
+                tracing::debug!("❌ Header {} not found in database: {}ms", block_number, elapsed.as_millis());
+                None
             },
             Err(e) => {
-                tracing::error!("Failed to fetch header for block {}: {:?}", block_number, e);
+                let elapsed = start_time.elapsed();
+                tracing::error!("💥 Failed to fetch header for block {} after {}ms: {:?}", block_number, elapsed.as_millis(), e);
                 None
             }
         }

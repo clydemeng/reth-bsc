@@ -53,24 +53,6 @@ where
         consensus
     }
 
-    /// Create consensus with database-backed persistent snapshots
-    pub fn with_database<DB: reth_db::database::Database + 'static>(
-        chain_spec: Arc<ChainSpec>,
-        database: DB,
-        epoch: u64,
-        cache_size: usize,
-    ) -> ParliaConsensus<ChainSpec, crate::consensus::parlia::provider::DbSnapshotProvider<DB>> {
-        let snapshot_provider = Arc::new(
-            crate::consensus::parlia::provider::DbSnapshotProvider::new(database, cache_size)
-        );
-        let consensus = ParliaConsensus::new(chain_spec, snapshot_provider, epoch);
-        
-        // Initialize genesis snapshot if needed
-        consensus.ensure_genesis_snapshot();
-        
-        consensus
-    }
-
     /// Validate block pre-execution using Parlia rules
     fn validate_block_pre_execution_impl(&self, block: &SealedBlock<BscBlock>) -> Result<(), ConsensusError> {
         // Check transaction root
@@ -89,17 +71,12 @@ where
     /// Ensure genesis snapshot exists
     fn ensure_genesis_snapshot(&self) {
         // Check if genesis snapshot already exists
-        if self.snapshot_provider.snapshot(0).is_some() {
+        if self.snapshot_provider.snapshot(0).is_some() {  // create the genesis snapshot inside snapshot(0)
+            tracing::info!("genesis snapshot for block 0 is ready");
             return;
         }
 
-        // Create genesis snapshot from chain spec
-        if let Ok(genesis_snapshot) = Self::create_genesis_snapshot(self.chain_spec.clone(), self.epoch) {
-            self.snapshot_provider.insert(genesis_snapshot);
-            tracing::info!("🎯 [BSC] Created genesis snapshot for block 0");
-        } else {
-            tracing::warn!("⚠️ [BSC] Failed to create genesis snapshot");
-        }
+        tracing::error!("Failed to create genesis snapshot");
     }
 
     /// Get reference to the snapshot provider

@@ -57,6 +57,18 @@ fn main() -> eyre::Result<()> {
 
             // Send the engine handle to the network
             engine_handle_tx.send(node.beacon_engine_handle.clone()).unwrap();
+            
+            // Start header cache monitoring (optional - for performance debugging)
+            tokio::spawn(async {
+                let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(60));
+                loop {
+                    interval.tick().await;
+                    let (cache_size, cache_capacity) = reth_bsc::consensus::parlia::header_cache::cache_stats();
+                    let cache_usage_pct = (cache_size as f64 / cache_capacity as f64) * 100.0;
+                    tracing::info!("🗂️  Header cache stats: {}/{} ({:.1}%) - Cache hit ratio should improve performance", 
+                                 cache_size, cache_capacity, cache_usage_pct);
+                }
+            });
 
             exit_future.await
         },
