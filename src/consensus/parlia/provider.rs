@@ -6,16 +6,24 @@ use crate::chainspec::BscChainSpec;
 use crate::hardforks::BscHardforks;
 use lazy_static::lazy_static;
 
-// Global header cache to eliminate database lookups (similar to zoro_reth's RECENT_SNAPS)
+// Global header cache to eliminate database lookups (similar to reth-bsc-trail's RECENT_SNAPS)
 lazy_static! {
     static ref GLOBAL_HEADER_CACHE: RwLock<schnellru::LruMap<u64, alloy_consensus::Header, schnellru::ByLength>> = 
         RwLock::new(schnellru::LruMap::new(schnellru::ByLength::new(2000))); // Cache 2000 headers
+}
+
+// Global snapshot cache (like reth-bsc-trail's RECENT_SNAPS)
+const SNAP_CACHE_NUM: usize = 2048;
+lazy_static! {
+    static ref GLOBAL_SNAPSHOT_CACHE: RwLock<schnellru::LruMap<alloy_primitives::B256, Snapshot, schnellru::ByLength>> = 
+        RwLock::new(schnellru::LruMap::new(schnellru::ByLength::new(SNAP_CACHE_NUM as u32))); // Cache 2048 snapshots by block hash
 }
 
 /// Global header cache utilities (for debugging and monitoring)
 pub mod header_cache {
     use super::GLOBAL_HEADER_CACHE;
     use alloy_consensus::Header;
+
     
     /// Get cache statistics for monitoring
     pub fn cache_stats() -> (usize, usize) {
@@ -37,27 +45,38 @@ pub mod header_cache {
     pub fn has_header(block_number: u64) -> bool {
         GLOBAL_HEADER_CACHE.read().peek(&block_number).is_some()
     }
+}
+
+/// Global snapshot cache utilities (like reth-bsc-trail's RECENT_SNAPS)
+pub mod snapshot_cache {
+    use super::{GLOBAL_SNAPSHOT_CACHE, Snapshot, SNAP_CACHE_NUM};
+    use alloy_primitives::B256;
     
-    /// Pre-load headers for a range of blocks (useful for batch operations)
-    pub fn preload_headers<Provider>(
-        provider: &Provider, 
-        start_block: u64, 
-        end_block: u64
-    ) -> usize 
-    where 
-        Provider: reth_provider::HeaderProvider<Header = alloy_consensus::Header> + Send + Sync,
-    {
-        let mut loaded_count = 0;
-        for block_num in start_block..=end_block {
-            if !has_header(block_num) {
-                if let Ok(Some(header)) = provider.header_by_number(block_num) {
-                    cache_header(block_num, header);
-                    loaded_count += 1;
-                }
-            }
-        }
-        tracing::debug!("🚀 Pre-loaded {} headers for range {}-{}", loaded_count, start_block, end_block);
-        loaded_count
+    /// Get cache statistics for monitoring
+    pub fn cache_stats() -> (usize, usize) {
+        let cache = GLOBAL_SNAPSHOT_CACHE.read();
+        (cache.len(), SNAP_CACHE_NUM) // (current_size, max_capacity)
+    }
+    
+    /// Get a snapshot from cache by block hash
+    pub fn get_snapshot(block_hash: B256) -> Option<Snapshot> {
+        GLOBAL_SNAPSHOT_CACHE.write().get(&block_hash).cloned()
+    }
+    
+    /// Cache a snapshot by block hash (like reth-bsc-trail does)
+    pub fn cache_snapshot(block_hash: B256, snapshot: Snapshot) {
+        GLOBAL_SNAPSHOT_CACHE.write().insert(block_hash, snapshot);
+        tracing::trace!("🔄 Cached snapshot for block hash {:?}", block_hash);
+    }
+    
+    /// Clear the global snapshot cache (useful for testing)
+    pub fn clear_cache() {
+        GLOBAL_SNAPSHOT_CACHE.write().clear();
+    }
+    
+    /// Check if a snapshot is in cache without affecting LRU order
+    pub fn has_snapshot(block_hash: B256) -> bool {
+        GLOBAL_SNAPSHOT_CACHE.read().peek(&block_hash).is_some()
     }
 }
 
@@ -406,7 +425,7 @@ where
     fn get_checkpoint_header(&self, block_number: u64) -> Option<alloy_consensus::Header> {
         let start_time = std::time::Instant::now();
         
-        // 🚀 FAST PATH: Check global cache first (like zoro_reth's approach)
+        // 🚀 FAST PATH: Check global cache first (like reth-bsc-trail's approach)
         {
             let mut cache = GLOBAL_HEADER_CACHE.write();
             if let Some(header) = cache.get(&block_number) {

@@ -30,7 +30,7 @@ pub use hertz_patch::{HertzPatchManager, StoragePatch};
 pub use transaction_splitter::{TransactionSplitter, SplitTransactions, TransactionSplitterError};
 pub use consensus::ParliaConsensus;
 pub use util::hash_with_chain_id;
-pub use provider::{SnapshotProvider, header_cache};
+pub use provider::{SnapshotProvider, header_cache, snapshot_cache};
 
 // A single object-safe trait to represent the Parlia consensus object when held globally.
 // This combines the execution-facing validator API with the consensus engine trait.

@@ -76,6 +76,7 @@ where
     pub(super) snapshot_provider: Option<Arc<dyn SnapshotProvider + Send + Sync>>,
     /// Parlia consensus instance used (optional during execution).
     pub(super) parlia_consensus: Option<Arc<dyn crate::consensus::parlia::ParliaConsensusObject + Send + Sync>>,
+
 }
 
 impl<'a, DB, EVM, Spec, R: ReceiptBuilder> BscBlockExecutor<'a, EVM, Spec, R>
@@ -123,8 +124,6 @@ where
             parlia_consensus: crate::shared::get_parlia_consensus().cloned(),
         }
     }
-
-
 
     /// Applies system contract upgrades if the Feynman fork is not yet active.
     fn upgrade_contracts(&mut self) -> Result<(), BlockExecutionError> {
@@ -642,13 +641,13 @@ where
             system_txs.push(tx);
         }
 
-        // DEBUG: Uncomment to trace system transaction processing
-        // debug!("🎯 [BSC] finish: processing {} system txs for slash handling", system_txs.len());
-        let system_txs_for_slash = system_txs.clone();
-        for (_i, tx) in system_txs_for_slash.iter().enumerate() {
-            // DEBUG: Uncomment to trace individual slash transaction handling
-            // debug!("⚔️  [BSC] finish: handling slash tx {}/{}: hash={:?}", i + 1, system_txs_for_slash.len(), tx.hash());
-            self.handle_slash_tx(tx)?;
+        if !system_txs.is_empty() {
+            trace!("🎯 [BSC] finish: processing {} system txs for slash handling", system_txs.len());
+            
+            // Batch process system transactions for better performance
+            for tx in &system_txs {
+                self.handle_slash_tx(tx)?;
+            }
         }
 
 
