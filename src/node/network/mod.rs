@@ -31,6 +31,14 @@ pub mod block_import;
 pub mod bootnodes;
 pub mod handshake;
 pub(crate) mod upgrade_status;
+pub(crate) mod votes;
+pub(crate) mod bsc_protocol {
+    pub mod protocol {
+        pub mod handler;
+        pub mod proto;
+    }
+    pub mod stream;
+}
 /// BSC `NewBlock` message value.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BscNewBlock(pub NewBlock<BscBlock>);
@@ -215,7 +223,9 @@ impl BscNetworkBuilder {
             .with_pow()
             .block_import(Box::new(BscBlockImport::new(handle)))
             .discovery(discv4)
-            .eth_rlpx_handshake(Arc::new(BscHandshake::default()));
+            .eth_rlpx_handshake(Arc::new(BscHandshake::default()))
+            .add_rlpx_sub_protocol(bsc_protocol::protocol::handler::BscProtocolHandler::default());
+        
 
         let mut network_config = ctx.build_network_config(network_builder);
         // Ensure our advertised fork ID matches the fork filter we validate against.

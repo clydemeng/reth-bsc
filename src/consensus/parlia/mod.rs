@@ -16,6 +16,7 @@ pub mod attestation;
 pub mod gas;
 pub mod hooks;
 pub mod slash_pool;
+pub mod vote_pool;
 pub mod transaction_splitter;
 pub mod consensus;
 pub mod util;
@@ -33,6 +34,7 @@ pub use error::ParliaConsensusError;
 pub use consensus::ParliaConsensus;
 pub use util::hash_with_chain_id;
 pub use provider::SnapshotProvider;
+pub use vote_pool as votes;
 
 // A single object-safe trait to represent the Parlia consensus object when held globally.
 // This combines the execution-facing validator API with the consensus engine trait.
