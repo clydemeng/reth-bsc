@@ -9366,6 +9366,7 @@ dependencies = [
  "auto_impl",
  "bit-set 0.5.3",
  "bls_on_arkworks",
+ "blst",
  "bytes 1.10.1",
  "cfg-if",
  "clap",

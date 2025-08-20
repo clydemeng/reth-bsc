@@ -1,17 +1,16 @@
 use alloy_rlp::Decodable;
+use serde::Serialize;
 use super::{
     ParliaHeaderValidator, SnapshotProvider, BscConsensusValidator, Snapshot, TransactionSplitter, SplitTransactions, VoteAttestation, ParliaConsensusError, 
     constants::*,
     votes::{*},
 };
 use alloy_consensus::{Header, TxReceipt, Transaction, BlockHeader};
-use alloy_primitives::{Address, Bytes, B256};
+use alloy_primitives::{map::foldhash::{HashSet, HashSetExt}, Address, Bytes, B256};
 use rand::Rng;
-use reth_primitives_traits::{GotExpected, SignerRecoverable};
+use reth_primitives_traits::{transaction::signature, GotExpected, SignerRecoverable};
 use crate::{
-    node::primitives::BscBlock,
-    hardforks::BscHardforks,
-    BscPrimitives,
+    consensus::parlia::{VoteAddress, VoteData, VoteEnvelope, VoteSignature}, hardforks::BscHardforks, node::primitives::BscBlock, BscPrimitives
 };
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use reth::consensus::{Consensus, FullConsensus, ConsensusError, HeaderValidator};
@@ -22,6 +21,7 @@ use reth_primitives_traits::{Block, SealedBlock, SealedHeader, RecoveredBlock};
 use reth_chainspec::EthChainSpec;
 use std::sync::Arc;
 use std::collections::HashMap;
+use blst::min_pk::{AggregateSignature, Signature as blsSignature};
 
 type SignFnPtr = fn(Address, &str, &[u8]) -> Result<[u8; 65], ConsensusError>;
 // type SignTxFnPtr = fn(Address, &mut dyn SignableTransaction<Signature>, u64) -> Result<Box<dyn SignableTransaction<Signature>>, ConsensusError>;
@@ -893,7 +893,7 @@ where
             }
 
             let mut header = block.header().clone();
-            if let Err(e) = self.assemble_vote_attestation_stub(&header) {
+            if let Err(e) = self.assemble_vote_attestation_stub(&mut header) {
                 tracing::error!(target: "parlia::seal", "Assemble vote attestation failed: {e}");
             }
 
@@ -966,14 +966,14 @@ where
     }
 
 
-    fn assemble_vote_attestation_stub(&self, header: &alloy_consensus::Header) -> Result<(), ConsensusError> {
+    fn assemble_vote_attestation_stub(&self, header: & mut alloy_consensus::Header) -> Result<(), ConsensusError> {
         if !self.chain_spec.is_luban_active_at_block(header.number()) || header.number() < 2 {
          return Ok(());
         }
 
-        let header = self.snapshot_provider.get_header_by_hash(&header.parent_hash)
+        let parent = self.snapshot_provider.get_header_by_hash(&header.parent_hash)
         .ok_or_else(|| ConsensusError::Other("parent not found".into()))?;
-        let _snap = self.snapshot_provider.snapshot(header.number-1)
+        let snap = self.snapshot_provider.snapshot(parent.number-1)
         .ok_or_else(|| ConsensusError::Other("Snapshot not found".into()))?;
 
         //TODO
@@ -981,10 +981,77 @@ where
         // if len(votes) < cmath.CeilDiv(len(snap.Validators)*2, 3) {
         //     return nil
         // }
-        let (justifiedBlockNumber, justifiedBlockHash) = match self.get_justified_number_and_hash(&header) {
+        let votes: Vec<VoteEnvelope> = Vec::new();
+
+        let (justifiedBlockNumber, justifiedBlockHash) = match self.get_justified_number_and_hash(&parent) {
             Ok((a, b)) => (a, b),
             Err(err) => return Err(err),
         };
+
+        let mut attestation = VoteAttestation::new_with_vote_data(
+            VoteData{
+                source_hash: justifiedBlockHash,
+                source_number: justifiedBlockNumber,
+                target_hash: parent.mix_hash,
+                target_number: parent.number,
+        });
+
+        for vote in votes.iter() {
+            if vote.data.hash() != attestation.data.hash() {
+                return Err(ConsensusError::Other(
+                    format!(
+                        "vote check error, expected: {:?}, real: {:?}",
+                        attestation.data,
+                        vote.data,
+                ).into(),
+                ));
+            }
+        }
+
+        let mut vote_addr_set: HashSet<VoteAddress> = HashSet::new();
+        let mut signatures: Vec<VoteSignature> = Vec::new();
+
+        for vote in votes.iter() {
+            vote_addr_set.insert(vote.vote_address);
+            signatures.push(vote.signature);
+        }
+
+        let sigs: Vec<blsSignature> = signatures.iter().map(
+                    |raw| blsSignature::from_bytes(raw.as_slice())
+                    .map_err(|e| ConsensusError::Other(format!("BLS sig decode error: {:?}", e).into()))
+                ).collect::<Result<_, _>>()?;
+        let sigs_ref: Vec<&blsSignature> = sigs.iter().collect();
+        attestation.agg_signature.copy_from_slice(
+            &AggregateSignature::aggregate(&sigs_ref, false)   // 聚合若干 Signature
+                .expect("aggregate failed")
+                .to_signature()
+                .to_bytes(),
+        );
+
+        for (_, val_info) in snap.validators_map.iter() {
+            if vote_addr_set.contains(&val_info.vote_addr) {
+                attestation.vote_address_set |= 1 << (val_info.index-1)
+            }
+        }
+
+        if attestation.vote_address_set.count_ones() as usize != signatures.len() {
+            tracing::warn!(
+                "assembleVoteAttestation, check VoteAddress Set failed, expected: {:?}, real: {:?}",
+                signatures.len(), attestation.vote_address_set.count_ones());
+            return Err(ConsensusError::Other("invalid attestation, check VoteAddress Set failed".into()));
+        }
+
+        let buf = alloy_rlp::encode(&attestation);
+        let extra_seal_start = header.extra_data.len() - EXTRA_SEAL;
+        let extra_seal_bytes = &header.extra_data[extra_seal_start..];
+
+
+        let mut new_extra = Vec::with_capacity(extra_seal_start + buf.len() + EXTRA_SEAL);
+        new_extra.extend_from_slice(&header.extra_data[..extra_seal_start]);
+        new_extra.extend_from_slice(buf.as_ref());
+        new_extra.extend_from_slice(extra_seal_bytes);
+
+        header.extra_data = Bytes::from(new_extra);
 
         Ok(())
     }
